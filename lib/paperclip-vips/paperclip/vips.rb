@@ -1,7 +1,7 @@
 module Paperclip
   class Vips < Processor
     attr_accessor :current_geometry, :target_geometry, :format, :whiny, :convert_options,
-                  :source_file_options, :auto_orient
+                  :source_file_options, :auto_orient, :save_options
 
     def initialize(file, options = {}, attachment = nil)
       super
@@ -69,8 +69,12 @@ module Paperclip
       def process_convert_options(image)
         if image && @options[:convert_options].present?
           commands = JSON.parse(@options[:convert_options], symbolize_names: true)
-          commands.each do |cmd|
-            image = ::Vips::Operation.call(cmd[:cmd], [image, *cmd[:args]], cmd[:optional] || {})
+          if commands.first.dig(:cmd) == 'save_options'
+            @save_options = commands.first.dig(:args)
+          else
+            commands.each do |cmd|
+              image = ::Vips::Operation.call(cmd[:cmd], [image, *cmd[:args]], cmd[:optional] || {})
+            end
           end
         end
 
@@ -89,15 +93,19 @@ module Paperclip
       end
 
       def save_jpg(thumbnail, path)
-        thumbnail.jpegsave(path)
+        thumbnail.jpegsave(path, save_options)
       end
 
       def save_gif(thumbnail, path)
-        thumbnail.magicksave(path)
+        thumbnail.magicksave(path, save_options_without_interlace)
       end
 
       def save_png(thumbnail, path)
-        thumbnail.pngsave(path)
+        thumbnail.pngsave(path, save_options_without_interlace)
+      end
+
+      def save_options_without_interlace
+        save_options.reject { |k, v| k == :interlace }
       end
   end
 end
