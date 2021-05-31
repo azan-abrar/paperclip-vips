@@ -11,7 +11,7 @@ module Paperclip
       @target_geometry = options.fetch(:string_geometry_parser, Geometry).parse(geometry)
       @current_geometry = options.fetch(:file_geometry_parser, Geometry).from_file(@file)
       @whiny = options.fetch(:whiny, true)
-      
+
       @current_format = current_format(file).downcase
       @format = options[:format] || @current_format
 
@@ -27,8 +27,9 @@ module Paperclip
         thumbnail = ::Vips::Image.thumbnail(source.path, width, { height: crop ? height : nil, crop: crop }) if @target_geometry
         thumbnail = ::Vips::Image.new_from_file(source.path) if !defined?(thumbnail) || thumbnail.nil?
         thumbnail = process_convert_options(thumbnail)
-        save_thumbnail(thumbnail, destination.path)
-        
+        auto_oriented_thumbnail = auto_rotate(thumbnail)
+        save_thumbnail(auto_oriented_thumbnail, destination.path)
+
       rescue => e
         if @whiny
           message = "There was an error processing the thumbnail for #{@basename}:\n" + e.message
@@ -65,7 +66,7 @@ module Paperclip
       def height
         @target_geometry&.height || @current_geometry.height
       end
-      
+
       def process_convert_options(image)
         if image && @options[:convert_options].present?
           commands = JSON.parse(@options[:convert_options], symbolize_names: true)
@@ -79,6 +80,10 @@ module Paperclip
         end
 
         return image
+      end
+
+      def auto_rotate(thumbnail)
+        thumbnail.autorot()
       end
 
       def save_thumbnail(thumbnail, path)
