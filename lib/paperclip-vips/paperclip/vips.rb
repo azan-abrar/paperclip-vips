@@ -27,9 +27,9 @@ module Paperclip
         thumbnail = ::Vips::Image.thumbnail(source.path, width, { height: crop ? height : nil, crop: crop }) if @target_geometry
         thumbnail = ::Vips::Image.new_from_file(source.path) if !defined?(thumbnail) || thumbnail.nil?
         thumbnail = process_convert_options(thumbnail)
-        auto_oriented_thumbnail = auto_rotate(thumbnail)
-        save_thumbnail(auto_oriented_thumbnail, destination.path)
+        thumbnail = auto_rotate(thumbnail) if save_options.dig(:autorot)
 
+        save_thumbnail(thumbnail, destination.path)
       rescue => e
         if @whiny
           message = "There was an error processing the thumbnail for #{@basename}:\n" + e.message
@@ -98,19 +98,28 @@ module Paperclip
       end
 
       def save_jpg(thumbnail, path)
-        thumbnail.jpegsave(path, save_options)
+        thumbnail.jpegsave(path, save_options_for(:jpegsave))
       end
 
       def save_gif(thumbnail, path)
-        thumbnail.magicksave(path, save_options_without_interlace)
+        thumbnail.magicksave(path, save_options_for(:magicksave))
       end
 
       def save_png(thumbnail, path)
-        thumbnail.pngsave(path, save_options_without_interlace)
+        thumbnail.pngsave(path, save_options_for(:pngsave))
       end
 
-      def save_options_without_interlace
-        save_options.reject { |k, v| k == :interlace }
+      def save_options_for(save_type)
+        allowed_type_options = case save_type
+        when :jpegsave
+          %i[interlace strip]
+        when :magicksave
+          %i[strip]
+        when :pngsave
+          %i[strip]
+        end
+
+        save_options.select { |k, v| k.in?(allowed_type_options) && v == true }
       end
   end
 end
